@@ -1,0 +1,29 @@
+# UltraEdit backup file
+*.bak
+*.o
+
+#sourceinght files
+*.IAB
+*.IAD
+*.IMB
+*.IMD
+*.PFI
+*.PO
+*.PR
+*.PRI
+*.PS
+*.WK3
+*.SearchResults
+
+*.f
+*.d
+*.i
+*.s
+*.S
+*.map
+*.line
+*.list
+*.rar
+*.tar
+*.tar.gz
+*.tar.bz2
