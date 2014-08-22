@@ -13,9 +13,9 @@ PKG_FIXUP:=autoreconf
 
 include $(INCLUDE_DIR)/package.mk
 ####################################################################
-define Package/onig
+define Package/libonig
   CATEGORY:=thirdpart-lib
-  TITLE:=onig
+  TITLE:=libonig
   DEPENDS:=
 endef
 
@@ -24,10 +24,10 @@ define Build/Compile
 	$(call Build/Compile/Default,)
 endef
 
-define Package/onig/install
+define Package/libonig/install
 	$(INSTALL_DIR) $(1)/usr/lib
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/.libs/libonig.so* $(1)/usr/lib/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/.libs/libonig.so.2.0.0 $(1)/usr/lib/libonig.so.2
 endef
 ####################################################################
-$(eval $(call BuildPackage,onig))
+$(eval $(call BuildPackage,libonig))
 

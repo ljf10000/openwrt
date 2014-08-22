@@ -22,7 +22,7 @@ include $(INCLUDE_DIR)/package.mk
 define Package/jq
   CATEGORY:=thirdpart-app
   TITLE:=jq
-  DEPENDS:=+libm +onig
+  DEPENDS:=+libm +libonig
 endef
 
 ONIG_PATH=$(BUILD_DIR)/onig-5.9.5
@@ -31,7 +31,7 @@ TARGET_CFLAGS += -std=gnu99 -I$(ONIG_PATH)
 TARGET_LDFLAGS += -L$(ONIG_PATH)/.libs
 
 define Build/Configure
-	$(call Build/Configure/Default,--disable-docs --disable-static)
+	$(call Build/Configure/Default,--disable-docs --disable-static --enable-silent-rules)
 endef
 
 #define Build/Compile
@@ -45,7 +45,7 @@ define Package/jq/install
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/jq $(1)/usr/bin/
 	
 	$(INSTALL_DIR) $(1)/usr/lib
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/.libs/libjq.so.1.0.4 $(1)/usr/lib/libjq.so
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/.libs/libjq.so.1.0.4 $(1)/usr/lib/libjq.so.1
 endef
 ####################################################################
 $(eval $(call BuildPackage,jq))
