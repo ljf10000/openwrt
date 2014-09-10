@@ -9,18 +9,18 @@
 #endif
 
 static inline int //return fd
-os_fdtransfer(void)
+os_fdtransfer(char *path)
 {
     int fd = INVALID_COMMON_ID;
     int err;
-    struct sockaddr_un local = OS_SOCKADDR_UNIX(FDSENDER_UNIX_SOCKET);
+    struct sockaddr_un local = OS_SOCKADDR_UNIX(path?path:FDSENDER_UNIX_SOCKET);
     
-    fd = os_socket(PF_UNIX, SOCK_DGRAM, 0);
+    fd = fd_socket(PF_UNIX, SOCK_DGRAM, 0);
     if (fd<0) {
         return errno;
     }
 
-    err = os_bind(fd, (struct sockaddr*)&local, sizeof(local));
+    err = fd_bind(fd, (struct sockaddr*)&local, sizeof(local));
     if (err<0) {
         close(fd);
 
@@ -33,61 +33,89 @@ os_fdtransfer(void)
 static inline int
 os_fdtransfer_close(int fd)
 {
-    return os_close(fd);
+    return fd_close(fd);
 }
 
-#define __SENDFD_CMSGSIZE (sizeof(struct cmsghdr) + sizeof(int))
+#define __FDTRANSFER_BUFMIN             1024
+#define __FDTRANSFER_CMSG_LEN           CMSG_SPACE(sizeof(int32_t))
 
-#define __FDTRANSFER(_buf, _bufcmptr, _cmptr, _iov, _msg) \
-    char _buf[2] = {0}; \
-    char _bufcmptr[__SENDFD_CMSGSIZE] = {0}; \
-    struct cmsghdr *_cmptr = (struct cmsghdr *)_bufcmptr; \
-    struct iovec _iov = OS_IOVEC_INITER(_buf, sizeof(_buf)); \
-    struct msghdr _msg = OS_MSGHDR_INITER(&_iov, 1, NULL, 0, _cmptr, __SENDFD_CMSGSIZE)
+#define __FDTRANSFER_EMPTY              "noNe"
+#define __FDTRANSFER_EMPTY_SIZE         (sizeof(__FDTRANSFER_EMPTY) - 1)
+#define __IS_FDTRANSFER_EMPTY(_buf)     \
+        os_memeq(_buf, __FDTRANSFER_EMPTY, __FDTRANSFER_EMPTY_SIZE)
+        
+#define __FDTRANSFER(_msg, _cmsg, _buf, _len) \
+    char ____fd_transfer_cmsg_buf[__FDTRANSFER_CMSG_LEN] = {0}; \
+    struct iovec ____fd_transfer_iov = OS_IOVEC_INITER(_buf, _len); \
+    struct msghdr _msg = \
+        OS_MSGHDR_INITER(&____fd_transfer_iov, 1, NULL, 0, \
+            ____fd_transfer_cmsg_buf, __FDTRANSFER_CMSG_LEN); \
+    struct cmsghdr *_cmsg = CMSG_FIRSTHDR(&_msg)
 
 static inline int
-os_fdsend(int sender, int fd)
+os_fdsend(int sender, int fd, void *buf, int len)
 {
     int err = 0;
-    __FDTRANSFER(buf, bufcmptr, cmptr, iov, msg);
     
     if (false==is_good_fd(sender)) {
         return os_assert_value(-EINVAL1);
     }
-    if (false==is_good_fd(fd)) {
+    else if (false==is_good_fd(fd)) {
         return os_assert_value(-EINVAL2);
     }
+    else if (NULL==buf) {
+        return os_assert_value(-EINVAL3);
+    }
+    else if (len<__FDTRANSFER_BUFMIN)) {
+        return os_assert_value(-EINVAL4);
+    }
 
-    cmptr->cmsg_level = SOL_SOCKET;
-    cmptr->cmsg_type  = SCM_RIGHTS;
-    cmptr->cmsg_len   = __SENDFD_CMSGSIZE;
-    *(int *)CMSG_DATA(cmptr) = fd;
+    __FDTRANSFER(msg, cmsg, buf, len);
 
-    err = sendmsg(sender, &msg, 0);
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type  = SCM_RIGHTS;
+    cmsg->cmsg_len   = __FDTRANSFER_CMSG_LEN;
+    *(int32_t *)CMSG_DATA(cmsg) = fd;
+
+    err = fd_sendmsg(sender, &msg, 0);
     if (2!=err) {
         return errno;
     }
-  
+
     return 0;  
 }
 
 
 static inline int
-os_fdrecv(int recver)
+os_fdrecv(int recver, char *buf, int *len)
 {
     int err = 0;
-    __FDTRANSFER(buf, bufcmptr, cmptr, iov, msg);
-    
+
     if (false==is_good_fd(recver)) {
         return os_assert_value(-EINVAL1);
     }
+    else if (NULL==buf) {
+        return os_assert_value(-EINVAL2);
+    }
+    else if (NULL==len) {
+        return os_assert_value(-EINVAL3);
+    }
+    else if (*len < __FDTRANSFER_BUFMIN) {
+        return os_assert_value(-EINVAL4);
+    }
+
+    __FDTRANSFER(msg, cmsg, buf, *len);
     
-    err = recvmsg(recver, &msg, 0);
-    if (2!=err) {
+    err = fd_recvmsg(recver, &msg, 0);
+    if (err<__FDTRANSFER_BUFMIN) {
         return errno;
+    } else if (__IS_FDTRANSFER_EMPTY(buf)) {
+        
+    } else {
+        *len = err;
     }
     
-    return *(int*)CMSG_DATA(cmptr);
+    return *(int*)CMSG_DATA(cmsg);
 }
 
 

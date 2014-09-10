@@ -106,6 +106,8 @@ define Package/autelan-partool/compile
 			$(TARGET_CPPFLAGS) \
 			-D__THIS_NAME=\\\"partool\\\" \
 			-D__AKID_DEBUG=__partool_debug \
+			-DNAME_PRODUCT=\\\"mtd6\\\" \
+			-DNAME_OSENV=\\\"mtd6\\\" \
 			-DPART_RW_MTD \
 			" \
 		LDFLAGS="$(TARGET_LDFLAGS)"

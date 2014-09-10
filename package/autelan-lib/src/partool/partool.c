@@ -2,7 +2,7 @@
 #include "utils.h"
 #include "partool.h"
 #ifdef __BOOT__
-int __AKID_DEBUG;
+int __AKID_DEBUG = 0;
 #endif
 
 #ifndef PART_XOR
@@ -153,8 +153,8 @@ part_unlock(struct part_block *block)
 }
 #endif /* __BOOT__ */
 
-static inline bool
-is_good_block(struct part_block *block)
+bool
+part_block_is_good(struct part_block *block)
 {
     if (NULL==block) {
         return false;
@@ -992,7 +992,7 @@ error:
 static int
 part_var_rw_check(struct part_block *block, int offset, void *buf, unsigned int size)
 {
-    if (false==is_good_block(block)) {
+    if (false==part_block_is_good(block)) {
         return os_assert_value(-EKEYBAD);
     }
     else if (offset >= block->size) {
@@ -1044,7 +1044,7 @@ part_block_write(part_block_t block, unsigned int offset, void *buf, unsigned in
 int
 part_block_crc_get(part_block_t block, unsigned int *crc_part, unsigned int *crc_calc)
 {
-    if (false==is_good_block(block)) {
+    if (false==part_block_is_good(block)) {
         return os_assert_value(-EKEYBAD);
     }
     else if (NULL==crc_part) {
@@ -1066,7 +1066,7 @@ part_var_foreach(part_block_t block, part_var_foreach_f *foreach, void *data)
     struct part_item *item, *n;
     multi_value_u mv = MV_INITER;
     
-    if (false==is_good_block(block)) {
+    if (false==part_block_is_good(block)) {
         return os_assert_value(-EKEYBAD);
     }
     else if (NULL==foreach) {
@@ -1136,7 +1136,7 @@ part_var_find(part_block_t block, char *name, struct part_cursor *c)
 {
     struct part_item *item;
     
-    if (false==is_good_block(block)) {
+    if (false==part_block_is_good(block)) {
         return os_assert_value(-EKEYBAD);
     }
     else if (NULL==name) {
@@ -1161,7 +1161,7 @@ __part_var_create(part_block_t block, char *name, char *value, int flag)
 {
     struct part_item *item = NULL;
     
-    if (false==is_good_block(block)) {
+    if (false==part_block_is_good(block)) {
         return os_assert_value(-EKEYBAD);
     }
     else if (NULL==name) {
@@ -1203,7 +1203,7 @@ __part_var_create(part_block_t block, char *name, char *value, int flag)
 int
 part_var_delete(part_block_t block, char *name)
 {
-    if (false==is_good_block(block)) {
+    if (false==part_block_is_good(block)) {
         return os_assert_value(-EKEYBAD);
     }
     else if (NULL==name) {

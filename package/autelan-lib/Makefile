@@ -77,64 +77,12 @@ define Package/libautelan-partool/compile
 			$(TARGET_CPPFLAGS) \
 			-D__THIS_NAME=\\\"libpartool\\\" \
 			-D__AKID_DEBUG=__libpartool_debug \
+			-DNAME_PRODUCT=\\\"mtd6\\\" \
+			-DNAME_OSENV=\\\"mtd6\\\" \
 			-DPART_XOR=0 \
 			" \
 		LDFLAGS="$(TARGET_LDFLAGS)"
 	$(CP) $(PKG_BUILD_DIR)/partool/libautelan-partool.so $(STAGING_DIR)/lib
-endef
-####################################################################
-define Package/libautelan-slice
-  SECTION:=libs
-  CATEGORY:=autelan-lib
-  TITLE:=Autelan Basic library
-  DEPENDS:=+libubox
-endef
-
-define Package/libautelan-slice/install
-	$(Package/autelan-lib/install/common)
-	
-	$(INSTALL_DATA) $(PKG_BUILD_DIR)/slice/libautelan-slice.so $(1)/lib/
-	$(INSTALL_DATA) $(PKG_BUILD_DIR)/slice/libslice.key $(1)/$(APPKEY_PATH)/
-endef
-
-define Package/libautelan-slice/compile
-	$(MAKE) -C $(PKG_BUILD_DIR)/slice \
-		CC="$(TARGET_CC)" \
-		CFLAGS=" \
-			$(TARGET_CFLAGS) \
-			$(TARGET_CPPFLAGS) \
-			-D__THIS_NAME=\\\"libslice\\\" \
-			-D__AKID_DEBUG=__libslice_debug \
-			" \
-		LDFLAGS="$(TARGET_LDFLAGS)"
-	$(CP) $(PKG_BUILD_DIR)/slice/libautelan-slice.so $(STAGING_DIR)/lib
-endef
-####################################################################
-define Package/libautelan-timer
-  SECTION:=libs
-  CATEGORY:=autelan-lib
-  TITLE:=Autelan Basic library
-  DEPENDS:=+libubox
-endef
-
-define Package/libautelan-timer/install
-	$(Package/autelan-lib/install/common)
-	
-	$(INSTALL_DATA) $(PKG_BUILD_DIR)/timer/libautelan-timer.so $(1)/lib/
-	$(INSTALL_DATA) $(PKG_BUILD_DIR)/timer/libtimer.key $(1)/$(APPKEY_PATH)/
-endef
-
-define Package/libautelan-timer/compile
-	$(MAKE) -C $(PKG_BUILD_DIR)/timer \
-		CC="$(TARGET_CC)" \
-		CFLAGS=" \
-			$(TARGET_CFLAGS) \
-			$(TARGET_CPPFLAGS) \
-			-D__THIS_NAME=\\\"libtimer\\\" \
-			-D__AKID_DEBUG=__libtimer_debug \
-			" \
-		LDFLAGS="$(TARGET_LDFLAGS)"
-	$(CP) $(PKG_BUILD_DIR)/timer/libautelan-timer.so $(STAGING_DIR)/lib
 endef
 ####################################################################
 define Build/Prepare
@@ -149,12 +97,8 @@ endef
 
 define Build/Compile
 	$(Package/libautelan-appkey/compile)
-	$(Package/libautelan-slice/compile)
-	$(Package/libautelan-timer/compile)
 	$(Package/libautelan-partool/compile)
 endef
 ####################################################################
 $(eval $(call BuildPackage,libautelan-appkey))
-$(eval $(call BuildPackage,libautelan-slice))
-$(eval $(call BuildPackage,libautelan-timer))
 $(eval $(call BuildPackage,libautelan-partool))

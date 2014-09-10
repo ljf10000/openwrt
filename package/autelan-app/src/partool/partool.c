@@ -8,47 +8,93 @@ Copyright (c) 2012-2015, Autelan Networks. All rights reserved.
 #include "utils.h"
 #include "utils/cmd.h"
 #include "partool/partool.h"
+#ifdef __BOOT__
+#include "partoolapi.h"
+#endif
 
 static int  partool_size;
 static part_block_t blk;
 
+/*
+* 如果新产品的定义与本文件默认定义不一致
+* 则应该在makefile中重定义以下信息
+*/
+#ifndef NAME_OSENV
 #ifdef __BOOT__
-#define ADDR_OSENV      0x9f050000
-#define SIZE_OSENV      (64*1024)
 #define NAME_OSENV      "osenv"
-#if SIZE_OSENV > PART_BLOCK_CACHE_SIZE
+#else
+#define NAME_OSENV      "mtd2"
+#endif
+#endif
+
+#ifndef NAME_PRODUCT
+#ifdef __BOOT__
+#define NAME_PRODUCT    "product"
+#else
+#define NAME_PRODUCT    "mtd8"
+#endif
+#endif
+
+#ifndef ADDR_OSENV
+#define ADDR_OSENV      0x9f050000
+#endif
+
+#ifndef ADDR_PRODUCT
+#define ADDR_PRODUCT    0x9ffe0000
+#endif
+
+#ifndef SIZE_OSENV
+#define SIZE_OSENV      PART_BLOCK_CACHE_SIZE
+#elif SIZE_OSENV > PART_BLOCK_CACHE_SIZE
 #error "SIZE_OSENV > PART_BLOCK_CACHE_SIZE"
 #endif
 
-#define ADDR_PRODUCT    0x9ffe0000
-#define SIZE_PRODUCT    (64*1024)
-#define NAME_PRODUCT    "product"
-#if SIZE_PRODUCT > PART_BLOCK_CACHE_SIZE
-#error "SIZE_OSENV > PART_BLOCK_CACHE_SIZE"
+#ifndef SIZE_PRODUCT
+#define SIZE_PRODUCT    PART_BLOCK_CACHE_SIZE
+#elif SIZE_PRODUCT > PART_BLOCK_CACHE_SIZE
+#error "SIZE_PRODUCT > PART_BLOCK_CACHE_SIZE"
 #endif
 
 #define ADDR_BAD        0xffffffff
-#define NAME_HELP       "partname must be " NAME_OSENV " or " NAME_PRODUCT
+#define NAME_GOOD       NAME_OSENV "|" NAME_PRODUCT
+#define NAME_HELP       "partname must be " NAME_GOOD
 
-static byte part_tmp[PART_BLOCK_CACHE_SIZE];
+static struct {
+    char *partition;
+    unsigned long addr;
+    int size;
+} part_info[] = {
+    {
+        .partition  = NAME_OSENV,
+        .addr       = ADDR_OSENV,
+        .size       = SIZE_OSENV,
+    },
+    {
+        .partition  = NAME_PRODUCT,
+        .addr       = ADDR_PRODUCT,
+        .size       = SIZE_PRODUCT,
+    }
+};
 
 static inline unsigned long 
 part_begin(char *partition)
 {
-    if (0==os_strcmp(partition, NAME_OSENV)) {
-        partool_size = SIZE_OSENV;
+    int i;
 
-        return ADDR_OSENV;
+    for (i=0; i<os_count_of(part_info); i++) {
+        if (0==os_strcmp(partition, part_info[i].partition)) {
+            partool_size = part_info[i].size;
+            
+            return part_info[i].addr;
+        }
     }
-    else if (0==os_strcmp(partition, NAME_PRODUCT)) {
-        partool_size = SIZE_PRODUCT;
-
-        return ADDR_PRODUCT;
-    }
-    else {
-        return ADDR_BAD;
-    }
+    
+    return ADDR_BAD;
 }
+
+#ifdef __BOOT__
+
+static byte part_tmp[PART_BLOCK_CACHE_SIZE];
 
 static inline void
 part_clean(void)
@@ -156,7 +202,7 @@ rm_fille(char *filename)
     * in debugging trace
     *   keep tmp file
     */
-    if (false==__debug_init_trace && filename[0]) {
+    if (false==__is_debug_init_trace && filename[0]) {
         os_v_system("rm -fr %s", filename);
 
         filename[0] = 0;
@@ -184,6 +230,8 @@ tmp_2_mtd(void)
 static inline int
 mtd_2_tmp(char *mtd)
 {
+    int size;
+    
 #if defined(PART_RW_MTD) || defined(PART_RW_CP)
 #   define part_read_format     "cp -f %s %s"
 #elif defined(PART_RW_DD)
@@ -196,8 +244,8 @@ mtd_2_tmp(char *mtd)
     
     os_v_system(part_read_format, partool_mtdfile, partool_tmpfile);
 
-    partool_size = os_sfsize(partool_tmpfile);
-    if (partool_size<0) {
+    size = os_sfsize(partool_tmpfile);
+    if (size != partool_size) {
         return -EINVAL;
     }
 
@@ -218,7 +266,13 @@ part_clean(void)
 static inline int
 part_init(char *partition)
 {
-    return mtd_2_tmp(partition);
+    if (ADDR_BAD==part_begin(partition)) {
+        os_println(NAME_HELP);
+        
+        return -EFORMAT;
+    } else {
+        return mtd_2_tmp(partition);
+    }
 }
 
 static inline int 
@@ -358,7 +412,7 @@ partool_init(int mode, int argc, char *argv[])
 }
 
 
-static inline void
+void
 partool_clean(void)
 {
     part_block_free(blk);
@@ -418,10 +472,14 @@ partool_crc(int argc, char *argv[])
     
     err = partool_init(PART_MODE_CRC, argc, argv);
     if (err<0) {
-        /* 
-        * just log it, NO return 
-        */
         debug_error("partool init error(%d)", err);
+        
+        /* 
+        * if block is good, NO return
+        */
+        if (false==part_block_is_good(blk)) {
+            return err;
+        }
     }
 
     part_block_crc_get(blk, &crc_part, &crc_calc);
@@ -490,8 +548,35 @@ partool_show_byname(int argc, char *argv[])
     return 0;
 }
 
+#ifdef __BOOT__
+int 
+partool_show_byname_api(int argc, char *argv[],void *buf)
+{
+    struct part_cursor c;
+    char *name = argv[4];
+    int err = 0;
+    int len;
+    
+    err = partool_init(PART_MODE_NORMAL, argc, argv);
+    if (err<0) {
+        return part_error(err, name);
+    }
+    
+    err = part_var_find(blk, name, &c);
+    if (err<0) {
+        return part_error(err, name);
+    }
+    len=strlen(c.v.len);
+    strncpy(buf, c.v.var,len);
+
+    show_cursor(&c, true);
+    
+    return 0;
+}
+#endif
+
 /* {"-part", "partname", "-new", "name", "value"} */
-static int 
+int 
 partool_new(int argc, char *argv[])
 {
     char *name = argv[4];
@@ -631,6 +716,7 @@ partool_update(int argc, char *argv[])
 }
 #endif
 
+#define PARTNAME_HELP   "partname(" NAME_GOOD ")"
 int 
 partool_main
 (
@@ -644,58 +730,58 @@ partool_main
 {
     struct command_item commands[] = {
         {
-            .list = {"-part", "partname", "-crc"},
+            .list = {"-part", PARTNAME_HELP, "-crc"},
             .func = partool_crc,
             .help = "calc crc",
         },
         {
-            .list = {"-part", "partname", "-empty"},
+            .list = {"-part", PARTNAME_HELP, "-empty"},
             .func = partool_empty,
             .help = "flush empty to mtd",
         },
         {
-            .list = {"-part", "partname", "-show"},
+            .list = {"-part", PARTNAME_HELP, "-show"},
             .func = partool_show_all,
             .help = "show all",
         },
         {
-            .list = {"-part", "partname", "-show", "name"},
+            .list = {"-part", PARTNAME_HELP, "-show", "name"},
             .func = partool_show_byname,
             .help = "show by name",
         },
         {
-            .list = {"-part", "partname", "-new", "name", "value"},
+            .list = {"-part", PARTNAME_HELP, "-new", "name", "value"},
             .func = partool_new,
             .help = "new(create or update)",
         },
         {
-            .list = {"-part", "partname", "-delete", "name"},
+            .list = {"-part", PARTNAME_HELP, "-delete", "name"},
             .func = partool_delete,
             .help = "delete by name, the name must must exist",
         },
 #ifndef __BOOT__
         {
-            .list = {"-part", "partname", "-load", "file"},
+            .list = {"-part", PARTNAME_HELP, "-load", "file"},
             .func = partool_load,
             .help = "load file(human readable) to mtd",
         },
         {
-            .list = {"-part", "partname", "-show", "-prefix", "name"},
+            .list = {"-part", PARTNAME_HELP, "-show", "-prefix", "name"},
             .func = partool_show_byprefix,
             .help = "show by name prefix",
         },
         {
-            .list = {"-part", "partname", "-delete", "-prefix", "name"},
+            .list = {"-part", PARTNAME_HELP, "-delete", "-prefix", "name"},
             .func = partool_delete_byprefix,
             .help = "delete by name prefix",
         },
         {
-            .list = {"-part", "partname", "-create", "name", "value"},
+            .list = {"-part", PARTNAME_HELP, "-create", "name", "value"},
             .func = partool_create,
             .help = "create name/value, the name cannot exist",
         },
         {
-            .list = {"-part", "partname", "-update", "name", "value"},
+            .list = {"-part", PARTNAME_HELP, "-update", "name", "value"},
             .func = partool_update,
             .help = "update name/value, the name must exist",
         },

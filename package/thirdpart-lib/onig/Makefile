@@ -20,8 +20,7 @@ define Package/libonig
 endef
 
 define Build/Compile
-	cp -fr files/* $(PKG_BUILD_DIR)/
-	$(call Build/Compile/Default,)
+	$(call Build/Compile/Default,includedir=.)
 endef
 
 define Package/libonig/install

@@ -27,7 +27,7 @@ l2user_update(bool created, struct apuser *dst, struct apuser *src)
     
     os_maccpy(dst->ap, src->ap);
     os_strdcpy(dst->ifname, src->ifname);
-	os_strdcpy(dst->vap, src->vap);
+    os_maccpy(dst->vap, src->vap);
     
     dst->local = src->local;
     dst->radioid = src->radioid;

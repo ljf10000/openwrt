@@ -3,10 +3,8 @@
 /******************************************************************************/
 #include "utils/list.h"
 
-#ifdef __BOOT__
 #ifndef PART_BLOCK_CACHE_SIZE
 #define PART_BLOCK_CACHE_SIZE   (64*1024)
-#endif
 #endif
 
 struct part_var {
@@ -130,6 +128,9 @@ part_block_write(part_block_t block, unsigned int offset, void *buf, unsigned in
 
 extern int
 part_block_crc_get(part_block_t block, unsigned int *crc_part, unsigned int *crc_calc);
+
+extern bool
+part_block_is_good(struct part_block *block);
 
 /*
 * find k/v from block list
