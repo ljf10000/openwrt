@@ -23,7 +23,9 @@ define Package/autelan-jsock/install
 	$(INSTALL_DIR) $(1)/etc/jsock/functions/
 	$(INSTALL_DIR) $(1)/etc/jsock/functions/msg/
 	$(INSTALL_DIR) $(1)/etc/jsock/functions/sig/
-	
+
+	sed -i 's,env += JSOCK_PEER=1.0.0.1,env += JSOCK_PEER=1.0.0.2,' ./src/jsock/etc/xinetd.d/jsock_tcp
+	sed -i 's,env += JSOCK_PEER=1.0.0.1,env += JSOCK_PEER=1.0.0.2,' ./src/jsock/etc/xinetd.d/jsock_udp
 	$(CP) ./src/jsock/etc/* $(1)/etc/
 endef
 ####################################################################
